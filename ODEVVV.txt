@@ -1,0 +1,347 @@
+package Test;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Scanner;
+
+public class Minesweeper {
+	
+    public static void main(String[] args) {
+        final Scanner scanner = new Scanner(System.in);
+        int NumberOfMines = 0;
+        final String GREETING = "::WELCOME::";
+        System.out.println(GREETING);        
+       
+        Pos corner = chooseSize(scanner);  
+        
+        while (true) {
+            System.out.println("Please select the difficulty (E, M, H):");
+            final String difficulty = scanner.nextLine().replaceAll("\\s", ""); 
+            NumberOfMines = corner.m * corner.n;
+            
+            if (difficulty.equals("E")) { // Easy %15               
+               NumberOfMines = NumberOfMines * 15 / 100;
+            }
+            else if (difficulty.equals("M")) {// Medium %25
+            	NumberOfMines = NumberOfMines * 25 / 100;
+            }
+            else if (difficulty.equals("H")) {// Hard %40
+            	NumberOfMines = NumberOfMines * 40 / 100;
+            }
+            else{
+            	 System.out.println("The difficulty has to be one of these (E, M, H):");
+                 continue;
+            }
+            break;
+        }
+                
+        final ValueOfArea[][] rawValues = fillAreaWithBombs(corner.m, corner.n, NumberOfMines);
+
+        final boolean isItWin = playUntilWinOrLoss(new Board(rawValues), scanner);
+        if (isItWin) {
+            System.out.println("Congratulations, you won.");
+        }
+        else {
+            System.out.println("You lost, better luck next time.");
+        }
+    }
+
+    private static boolean playUntilWinOrLoss(Board area, Scanner scanner) {
+        while (true) {
+            printPole(area);
+            if (makeMove(area, scanner) == MoveHitsBomb.HIT) {
+            	System.out.println();
+                for (int m = area.height -1; m > -1; m--) {
+                    for (int n = 0; n < area.width; n++) {
+                        System.out.print(area.appearanceLastAt(new Pos(m, n)) + " ");
+                    }
+                    System.out.println();
+                }
+                return false;
+            }
+            if (isWinningBoard(area)) {            	
+                return true;
+            }
+        }
+    }
+
+    private static boolean isWinningBoard(Board board) {
+        for (int m = board.height -1; m > -1 ; m--) {
+            for (int n = 0; n < board.width; n++) {
+                if (!board.isBombAt(new Pos(m, n)) && !board.isOpenAt(new Pos(m, n))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    enum MoveHitsBomb {
+        HIT, NOHIT
+    }
+
+    private static MoveHitsBomb makeMove(Board area, Scanner scanner) {
+        while(true) {
+        	String action = "open";
+            System.out.println("Please make a move:");
+            String[] commandAndXAndY;
+            String temp = scanner.nextLine();
+            
+            if(temp.length() > 3) {
+            	action = temp.split(" ")[1];
+            	temp = temp.split(" ")[0];
+            	commandAndXAndY = temp.split(",");
+            	
+            	if(action.equals("F"))
+            		action = "mark";
+            	else if(action.equals("U"))
+            		action = "unmark";
+            	else{
+            		System.out.println("fill out the form correctly!");
+                    continue;
+            	}
+            }
+            else {            	
+            	commandAndXAndY = temp.split(",");
+            }
+            
+            if (commandAndXAndY.length != 2) {
+                System.out.println("fill out the form correctly!");
+                continue;
+            }
+            
+            if (!action.equals("open") && !action.equals("mark") && !action.equals("unmark")) {
+                System.out.println("first work should be equal \"flag\" or \"unflag\"!");
+                continue;
+            }
+
+            final int m;
+            try {
+                m = Integer.parseInt(commandAndXAndY[0]) - 1;
+            } catch (NumberFormatException | NullPointerException nfe) {
+                System.out.println("m should be a number!");
+                continue;
+            }
+
+            final int n;
+            try {
+                n = Integer.parseInt(commandAndXAndY[1]) - 1;
+            } catch (NumberFormatException | NullPointerException nfe) {
+                System.out.println("n should be a number!");
+                continue;
+            }
+
+            if (m < 0 || area.height <= m) {
+                System.out.println("m should be between 1 and " + (area.height));
+                continue;
+            }
+            if (n < 0 || area.width <= n) {
+                System.out.println("n should be between 1 and " + (area.width));
+                continue;
+            }       
+            
+            if (action.equals("open")) {
+            	if(area.isOpenAt(new Pos(m,n))) {
+            		System.out.println("Cell is already open");
+            		return MoveHitsBomb.NOHIT;
+            	}
+            	
+                if (area.isBombAt(new Pos(m, n))) {
+                    return MoveHitsBomb.HIT;
+                }
+                
+                area.open(new Pos(m, n));
+                return MoveHitsBomb.NOHIT;
+            }
+            else if(action.equals("mark")){ // flag
+            	if(area.isOpenAt(new Pos(m,n))) {
+            		System.out.println("Open cells cannot be flagged .");
+            		return MoveHitsBomb.NOHIT;
+            	}
+                area.markAsBombAt(new Pos(m, n));
+                return MoveHitsBomb.NOHIT;
+            }
+            else if(action.equals("unmark")){ // unflag
+            	 if(area.isOpenAt(new Pos(m,n))) {
+            		 System.out.println("Only flagged cells can be unflagged .");
+            		 return MoveHitsBomb.NOHIT;
+            	 }
+            	 area.unMarkAsBombAt(new Pos(m, n));
+                 return MoveHitsBomb.NOHIT;
+            }
+        }
+    }
+
+    private static void printPole(Board area) {
+        System.out.println();
+        for (int m = area.height -1; m > -1; m--) {
+            for (int n = 0; n < area.width; n++) {
+                System.out.print(area.appearanceAt(new Pos(m, n)) + " ");
+            }
+            System.out.println();
+        }
+    }
+
+    private static ValueOfArea[][] fillAreaWithBombs(int width, int height, int howManyBombs) {
+        ValueOfArea[][] area = new ValueOfArea[height][width];
+        ArrayList<Pos> listOfAllPositions = new ArrayList<>();
+        for (int m = area.length -1; m > -1; m--) {
+            for (int n = 0; n < area.length; n++) {
+                area[m][n] = ValueOfArea.EMPTY;
+                listOfAllPositions.add(new Pos(m, n));
+            }
+        }
+        Collections.shuffle(listOfAllPositions);
+
+        for (int i = 0; i < listOfAllPositions.size() && i < howManyBombs; i++) {
+            area[listOfAllPositions.get(i).m][listOfAllPositions.get(i).n] = ValueOfArea.BOMB;
+        }
+
+        return area;
+    }
+
+    private static Pos chooseSize(Scanner scanner) {
+        while (true) {
+            System.out.println("Please enter the sizes of the board (m x n) :");
+            final String[] turnXandY = scanner.nextLine().replaceAll("\\s", "").split("x"); 
+            if (turnXandY.length != 2) {
+                System.out.println("print :m x n");
+                continue;
+            }
+            if (!isNumeric(turnXandY[0]) || !isNumeric(turnXandY[1])) {
+                System.out.println("m and n should be numbers!");
+                continue;
+            }
+            if (Integer.parseInt(turnXandY[0]) <= 0 || Integer.parseInt(turnXandY[1]) <= 0) {
+                System.out.println("m and n should be >0!");
+                continue;
+            }
+            return new Pos(Integer.parseInt(turnXandY[0]), Integer.parseInt(turnXandY[1]));
+        }
+    }
+    
+    public static boolean isNumeric(String strNum) {
+        try {
+            Integer.parseInt(strNum);
+        } catch (NumberFormatException | NullPointerException nfe) {
+            return false;
+        }
+        return true;
+    }
+}
+
+final class Pos {
+    public final int m;
+    public final int n;
+    Pos(int m, int n) {
+        this.m = m;
+        this.n = n;
+    }
+}
+
+enum StatusOfArea {
+    MARKEDASBOMB, OPENED, CLOSED
+}
+enum ValueOfArea {
+    EMPTY, BOMB
+}
+
+class Board {
+    private final ValueOfArea[][] values;
+    private final StatusOfArea[][] statuses;
+
+    public final int width;
+    public final int height;
+
+    Board(ValueOfArea[][] values) {
+        this.values = values;
+        this.height = values.length;
+        this.width = values[0].length;
+        this.statuses = new StatusOfArea[height][width];
+        for (StatusOfArea[] row : statuses) {
+            Arrays.fill(row, StatusOfArea.CLOSED);
+        }
+    }
+    public String appearanceAt(Pos p) {
+        if (statuses[p.m][p.n] == StatusOfArea.CLOSED) {
+            return "o";
+        }
+        if (statuses[p.m][p.n] == StatusOfArea.MARKEDASBOMB) {
+            return "F";
+        }
+        int count = countMineNeighbors(p);
+        if (count == 0) {
+            return "-";
+        }
+        return "" + count;
+    }
+    
+    public String appearanceLastAt(Pos p) {
+    	if (values[p.m][p.n] == ValueOfArea.BOMB) {
+            return "X";
+        }
+    	
+        if (statuses[p.m][p.n] == StatusOfArea.CLOSED) {
+            return "o";
+        }
+        if (statuses[p.m][p.n] == StatusOfArea.MARKEDASBOMB) {
+            return "F";
+        }        
+        int count = countMineNeighbors(p);
+        if (count == 0) {
+            return "-";
+        }
+        return "" + count;
+    }
+    
+    public boolean inBounds(Pos p) {
+        return p.m >= 0 && p.m < height && p.n >= 0 && p.n < width;
+    }
+    public int countMineNeighbors(Pos p) {
+        int count = 0;
+        for (int dm = -1; dm <= 1; dm++) {
+            for (int dn = -1; dn <= 1; dn++) {
+                Pos neighbor = new Pos(p.m + dm, p.n + dn);
+                if (this.inBounds(neighbor) && this.isBombAt(neighbor)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+    public boolean isBombAt(Pos p) {
+        return this.values[p.m][p.n] == ValueOfArea.BOMB;
+    }
+    public boolean isOpenAt(Pos p) {
+        return this.statuses[p.m][p.n] == StatusOfArea.OPENED;
+    }
+    public void markAsBombAt(Pos p) {
+        this.statuses[p.m][p.n] = StatusOfArea.MARKEDASBOMB;
+    }
+    public void unMarkAsBombAt(Pos p) {
+        this.statuses[p.m][p.n] = StatusOfArea.CLOSED;
+    }
+    public void open(Pos p) {
+        if (this.statuses[p.m][p.n] == StatusOfArea.OPENED) {        	
+            return;
+        }
+        
+        else if (this.statuses[p.m][p.n] == StatusOfArea.MARKEDASBOMB) {        	
+            return;
+        }
+        
+        this.statuses[p.m][p.n] = StatusOfArea.OPENED;
+
+        if (this.countMineNeighbors(p) == 0) {
+            for (int dm = -1; dm <= 1; dm++) {
+                for (int dn = -1; dn <= 1; dn++) {
+                    Pos neighbor = new Pos(p.m + dm, p.n + dn);
+                    if (this.inBounds(neighbor)) {
+                        this.open(neighbor);
+                    }
+                }
+            }
+        }
+    }
+}
